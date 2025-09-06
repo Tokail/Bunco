@@ -19,7 +19,9 @@ export function useGame() {
     isRolling: false,
     isTurnEnding: false,
     timer: 10,
-    isTimerActive: false
+    isTimerActive: false,
+    diceVisible: false,
+    isDisplayingScore: false
   }));
   
   const soundService = useRef(new SoundService());
@@ -54,6 +56,16 @@ export function useGame() {
     setTimeout(() => {
       setIsBotShaking(false);
     }, 100);
+  }, []);
+
+  // Function to show dice when cup is clicked
+  const showDice = useCallback(() => {
+    setGameState(prev => ({ ...prev, diceVisible: true }));
+  }, []);
+
+  // Function to hide dice after turn ends
+  const hideDice = useCallback(() => {
+    setGameState(prev => ({ ...prev, diceVisible: false }));
   }, []);
   
   const startTimer = useCallback(() => {
@@ -137,11 +149,13 @@ export function useGame() {
       setGameState(currentState => {
         if (!currentState.gameWinner) {
           // Get the next player in clockwise order after the round win
-          const nextPlayer = currentState.players[currentState.currentPlayer];
+          const nextPlayerIndex = GameLogicService.getNextPlayer(currentState.currentPlayer, currentState.players);
+          const nextPlayer = currentState.players[nextPlayerIndex];
           
-          if (nextPlayer.isHuman) {
-            startTimer();
+          if (nextPlayer?.isHuman) {
+            setTimeout(() => startTimer(), 500);
           } else {
+            // Bot turn
             const delay = BotAIService.getBotDelay(nextPlayer.id);
             botTimeoutRef.current = setTimeout(() => {
               triggerBotShake();
@@ -154,32 +168,37 @@ export function useGame() {
         }
         return currentState;
       });
-    }, 2000);
+    }, 500);
   }, [startTimer]);
 
   const nextTurn = useCallback(() => {
     setGameState(prev => {
       const nextPlayerIndex = GameLogicService.getNextPlayer(prev.currentPlayer, prev.players);
+      const nextPlayer = prev.players[nextPlayerIndex];
       
       return {
         ...prev,
         currentPlayer: nextPlayerIndex,
         turnScore: 0,
-        isTurnEnding: false
+        isTurnEnding: false,
+        diceVisible: false, // Hide dice when turn ends
+        isDisplayingScore: false // Reset score display state
       };
     });
     
     setLastScoreResult(null);
     setMatchingDice({ indices: [], scores: [] });
     
-    // Start bot turn or human timer
+    // Start next player's turn after delay
     setTimeout(() => {
       setGameState(currentState => {
-        const nextPlayer = currentState.players[currentState.currentPlayer];
-        if (nextPlayer.isHuman) {
-          startTimer();
+        const currentPlayer = currentState.players[currentState.currentPlayer];
+        
+        if (currentPlayer?.isHuman) {
+          setTimeout(() => startTimer(), 500);
         } else {
-          const delay = BotAIService.getBotDelay(nextPlayer.id);
+          // Bot turn
+          const delay = BotAIService.getBotDelay(currentPlayer.id);
           botTimeoutRef.current = setTimeout(() => {
             triggerBotShake();
             // Small delay to let shake start before rolling
@@ -199,112 +218,138 @@ export function useGame() {
       
       stopTimer();
       
+      // Hide dice before starting new roll to ensure animation triggers
       // Play shake sound
       soundService.current.diceShake();
       
-      setTimeout(() => {
-        // Get the current round target from the latest state
-        setGameState(currentState => {
-          // Use the current state's roundTarget for the dice roll
-          const roll = GameLogicService.rollDiceWithTarget(currentState.roundTarget);
-          const newDice = [roll.dice1, roll.dice2, roll.dice3];
-          
-          // Play roll sound
-          soundService.current.diceRoll();
-          
-          // Calculate matching dice for visual feedback
-          const { matchingIndices, scoreByDie } = GameLogicService.getMatchingDice(newDice, currentState.roundTarget);
-          setMatchingDice({ indices: matchingIndices, scores: scoreByDie });
-          
-          const scoreResult = GameLogicService.calculateScore(roll, currentState.roundTarget);
-          setLastScoreResult(scoreResult);
-          
-          // Play appropriate sound based on result
-          switch (scoreResult.type) {
+      return { ...prevState, diceVisible: false, isRolling: true, isDisplayingScore: false };
+    });
+    
+    // Brief delay to ensure dice are hidden before showing them again
+    setTimeout(() => {
+      // Get the current round target from the latest state
+      setGameState(currentState => {
+        // Use the current state's roundTarget for the dice roll
+        const roll = GameLogicService.rollDiceWithTarget(currentState.roundTarget);
+        const newDice = [roll.dice1, roll.dice2, roll.dice3];
+        
+        // Play roll sound
+        soundService.current.diceRoll();
+        
+        // Calculate matching dice for visual feedback
+        const { matchingIndices, scoreByDie } = GameLogicService.getMatchingDice(newDice, currentState.roundTarget);
+        setMatchingDice({ indices: matchingIndices, scores: scoreByDie });
+        
+        const scoreResult = GameLogicService.calculateScore(roll, currentState.roundTarget);
+        setLastScoreResult(scoreResult);
+        
+        // Play appropriate sound based on result
+        switch (scoreResult.type) {
+          case 'bunco':
+            soundService.current.bunco();
+            break;
+          case 'baby-bunco':
+            soundService.current.babyBunco();
+            break;
+        }
+        
+        const currentPlayer = currentState.players[currentState.currentPlayer];
+        const newScore = currentPlayer.score + scoreResult.points;
+        
+        const updatedPlayers = [...currentState.players];
+        updatedPlayers[currentState.currentPlayer] = {
+          ...updatedPlayers[currentState.currentPlayer],
+          score: newScore
+        };
+        
+        consecutiveRollsRef.current++;
+        
+        // Determine if turn will end based on game rules and bot decisions
+        let shouldEndTurn = newScore >= 21 || scoreResult.endTurn;
+        
+        // For bots, also check their decision if the turn could continue
+        if (!shouldEndTurn && !currentPlayer.isHuman) {
+          const shouldContinue = BotAIService.shouldBotContinueRolling(
+            currentPlayer,
+            currentState,
+            consecutiveRollsRef.current
+          );
+          shouldEndTurn = !shouldContinue;
+        }
+        
+        // Calculate dynamic display duration based on score type
+        const getDiceDisplayDuration = (scoreType: string) => {
+          switch (scoreType) {
             case 'bunco':
-              soundService.current.bunco();
-              break;
+              return 4000; // 4 seconds for bunco animation
             case 'baby-bunco':
-              soundService.current.babyBunco();
-              break;
+              return 3000; // 3 seconds for baby bunco animation
+            default:
+              return 2000; // 2 seconds minimum for regular scores
           }
-          
-          const currentPlayer = currentState.players[currentState.currentPlayer];
-          const newScore = currentPlayer.score + scoreResult.points;
-          
-          const updatedPlayers = [...currentState.players];
-          updatedPlayers[currentState.currentPlayer] = {
-            ...updatedPlayers[currentState.currentPlayer],
-            score: newScore
-          };
-          
-          consecutiveRollsRef.current++;
-          
-          // Determine if turn will end based on game rules and bot decisions
-          let shouldEndTurn = newScore >= 21 || scoreResult.endTurn;
-          
-          // For bots, also check their decision if the turn could continue
-          if (!shouldEndTurn && !currentPlayer.isHuman) {
-            const shouldContinue = BotAIService.shouldBotContinueRolling(
-              currentPlayer,
-              currentState,
-              consecutiveRollsRef.current
-            );
-            shouldEndTurn = !shouldContinue;
-          }
-          
-          // Check for round win
-          if (newScore >= 21) {
-            soundService.current.roundWin();
-            setTimeout(() => endRound(currentPlayer.team), 1500);
+        };
+        
+        const displayDuration = getDiceDisplayDuration(scoreResult.type);
+        
+        // Always hide dice after display duration for continuing turns
+        if (!scoreResult.endTurn && newScore < 21) {
+          setTimeout(() => {
+            setGameState(prev => ({ ...prev, diceVisible: false, isDisplayingScore: false }));
+          }, displayDuration);
+        }
+        
+        // Check for round win
+        if (newScore >= 21) {
+          soundService.current.roundWin();
+          setTimeout(() => endRound(currentPlayer.team), displayDuration);
+        } else {
+          // Handle turn continuation or end
+          if (scoreResult.endTurn) {
+            consecutiveRollsRef.current = 0;
+            setTimeout(() => nextTurn(), displayDuration);
           } else {
-            // Handle turn continuation or end
-            if (scoreResult.endTurn) {
-              consecutiveRollsRef.current = 0;
-              setTimeout(() => nextTurn(), 1500);
+            // Continue turn - either human decides or bot decides
+            if (currentPlayer.isHuman) {
+              setTimeout(() => startTimer(), displayDuration - 1000); // Start timer 1s before dice disappear
             } else {
-              // Continue turn - either human decides or bot decides
-              if (currentPlayer.isHuman) {
-                setTimeout(() => startTimer(), 1000);
+              // Bot decision making (we already calculated shouldContinue above)
+              const shouldContinue = BotAIService.shouldBotContinueRolling(
+                currentPlayer,
+                currentState,
+                consecutiveRollsRef.current
+              );
+              
+              if (shouldContinue) {
+                const delay = BotAIService.getBotDelay(currentPlayer.id);
+                botTimeoutRef.current = setTimeout(() => {
+                  // Dice should already be visible for continuing rolls
+                  triggerBotShake();
+                  // Small delay to let shake start before rolling
+                  setTimeout(() => {
+                    rollDiceRef.current?.();
+                  }, 50);
+                }, delay);
               } else {
-                // Bot decision making (we already calculated shouldContinue above)
-                const shouldContinue = BotAIService.shouldBotContinueRolling(
-                  currentPlayer,
-                  currentState,
-                  consecutiveRollsRef.current
-                );
-                
-                if (shouldContinue) {
-                  const delay = BotAIService.getBotDelay(currentPlayer.id);
-                  botTimeoutRef.current = setTimeout(() => {
-                    triggerBotShake();
-                    // Small delay to let shake start before rolling
-                    setTimeout(() => {
-                      rollDiceRef.current?.();
-                    }, 50);
-                  }, delay);
-                } else {
-                  consecutiveRollsRef.current = 0;
-                  setTimeout(() => nextTurn(), 1500);
-                }
+                consecutiveRollsRef.current = 0;
+                setTimeout(() => nextTurn(), displayDuration);
               }
             }
           }
-          
-          return {
-            ...currentState,
-            dice: newDice,
-            lastRoll: newDice,
-            turnScore: currentState.turnScore + scoreResult.points,
-            players: updatedPlayers,
-            isRolling: false,
-            isTurnEnding: shouldEndTurn
-          };
-        });
-      }, 3200); // Dice trajectory animation duration (3.2 seconds total for 5 phases)
-      
-      return { ...prevState, isRolling: true };
-    });
+        }
+        
+        return {
+          ...currentState,
+          dice: newDice,
+          lastRoll: newDice,
+          turnScore: currentState.turnScore + scoreResult.points,
+          players: updatedPlayers,
+          isRolling: false,
+          isTurnEnding: shouldEndTurn,
+          diceVisible: true,
+          isDisplayingScore: true
+        };
+      });
+    }, 1000); // Increased from 750ms to 1000ms to ensure animations complete (10ms spawn + 500ms travel + 150ms settle + buffer)
   }, [stopTimer, startTimer, endRound, nextTurn]);
 
   // Update the ref when rollDice changes
@@ -333,7 +378,9 @@ export function useGame() {
       isRolling: false,
       isTurnEnding: false,
       timer: 10,
-      isTimerActive: false
+      isTimerActive: false,
+      diceVisible: false,
+      isDisplayingScore: false
     });
     
     setLastScoreResult(null);
@@ -366,6 +413,8 @@ export function useGame() {
     lastScoreResult,
     matchingDice,
     soundService: soundService.current,
-    isBotShaking
+    isBotShaking,
+    showDice,
+    hideDice
   };
 }

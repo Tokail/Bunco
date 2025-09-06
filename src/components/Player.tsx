@@ -12,9 +12,11 @@ interface PlayerProps {
   isTurnEnding?: boolean;
   soundService?: { diceShake: () => void };
   triggerShake?: boolean;
+  onShowDice?: () => void;
+  isDisplayingScore?: boolean;
 }
 
-export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = false, isTurnEnding = false, soundService, triggerShake = false }: PlayerProps) {
+export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = false, isTurnEnding = false, soundService, triggerShake = false, onShowDice, isDisplayingScore = false }: PlayerProps) {
   const [isShaking, setIsShaking] = useState(false);
   const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -27,6 +29,25 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     };
   }, []);
   
+  // Helper function to calculate shake animation duration from CSS
+  const calculateShakeDuration = () => {
+    // Create a temporary element to read CSS animation properties
+    const tempElement = document.createElement('div');
+    tempElement.className = 'cup-shaking';
+    tempElement.style.position = 'absolute';
+    tempElement.style.visibility = 'hidden';
+    tempElement.style.pointerEvents = 'none';
+    document.body.appendChild(tempElement);
+    
+    const computedStyle = window.getComputedStyle(tempElement);
+    const duration = parseFloat(computedStyle.animationDuration) || 0.9; // fallback to 0.9s
+    const iterationCount = parseFloat(computedStyle.animationIterationCount) || 1; // fallback to 1
+    
+    document.body.removeChild(tempElement);
+    
+    return duration * iterationCount * 1000; // convert to milliseconds
+  };
+
   // Shared shake animation logic for both human clicks and bot triggers
   const startShakeAnimation = () => {
     // Start shake animation
@@ -40,38 +61,26 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
       clearTimeout(shakeTimeoutRef.current);
     }
     
-    // Dynamically calculate total animation duration from CSS
-    const calculateAnimationDuration = () => {
-      // Create a temporary element to read CSS animation properties
-      const tempElement = document.createElement('div');
-      tempElement.className = 'cup-shaking';
-      tempElement.style.position = 'absolute';
-      tempElement.style.visibility = 'hidden';
-      tempElement.style.pointerEvents = 'none';
-      document.body.appendChild(tempElement);
-      
-      const computedStyle = window.getComputedStyle(tempElement);
-      const duration = parseFloat(computedStyle.animationDuration) || 0.9; // fallback to 0.9s
-      const iterationCount = parseFloat(computedStyle.animationIterationCount) || 1; // fallback to 1
-      
-      document.body.removeChild(tempElement);
-      
-      return duration * iterationCount * 1000; // convert to milliseconds
-    };
-    
     // End shake animation after full CSS animation duration
-    const totalDuration = calculateAnimationDuration();
+    const totalDuration = calculateShakeDuration();
     shakeTimeoutRef.current = setTimeout(() => {
       setIsShaking(false);
     }, totalDuration);
+    
+    return totalDuration; // Return duration for external use
   };
   
   // Handle external shake trigger for bots
   useEffect(() => {
     if (triggerShake && !player.isHuman && isCurrentPlayer) {
-      startShakeAnimation();
+      const shakeDuration = startShakeAnimation();
+      
+      // Show dice when bot cup stops shaking (same as human players)
+      setTimeout(() => {
+        onShowDice?.();
+      }, shakeDuration);
     }
-  }, [triggerShake, player.isHuman, isCurrentPlayer]);
+  }, [triggerShake, player.isHuman, isCurrentPlayer, onShowDice]);
   // Debug logging for human player (if needed)
   // if (player.isHuman) {
   //   console.log('Human player render:', {
@@ -91,16 +100,21 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     return `player ${position} ${teamColor} ${active}`.trim();
   };
 
-  // Only allow cup clicks for human players who are current player and can roll and not currently rolling and turn is not ending
-  const isCupClickable = isCurrentPlayer && player.isHuman && canRoll && onRoll && !isRolling && !isTurnEnding;
+  // Only allow cup clicks for human players who are current player and can roll and not currently rolling and turn is not ending and not displaying score
+  const isCupClickable = isCurrentPlayer && player.isHuman && canRoll && onRoll && !isRolling && !isTurnEnding && !isDisplayingScore;
   
   const handleCupClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     
     if (!isCupClickable || !onRoll) return;
     
-    // Start shake animation
-    startShakeAnimation();
+    // Start shake animation and get its duration
+    const shakeDuration = startShakeAnimation();
+    
+    // Show dice when cup stops shaking
+    setTimeout(() => {
+      onShowDice?.();
+    }, shakeDuration);
     
     // Trigger dice roll at 300ms (mid-shake) for human players
     setTimeout(() => {
@@ -117,12 +131,9 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     zIndex: 100,
     // Force new stacking context
     isolation: 'isolate',
-    // Add transparency when rolling or turn ending
-    opacity: (isRolling || isTurnEnding) && isCurrentPlayer && player.isHuman ? 0.5 : 1,
-    // Add disabled class for CSS targeting
-    ...((isRolling || isTurnEnding) && isCurrentPlayer && player.isHuman && {
-      filter: 'grayscale(20%)'
-    })
+    // Keep cups visually normal - only disable interaction, not appearance
+    opacity: 1,
+    // Remove visual disabled effects - cups should look normal even when disabled
   });
   
   // Check if player is in top position (text should appear above avatar)
@@ -151,9 +162,10 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
 
 
   return (
-    <div 
+    <div
       className={getPlayerClasses()}
       data-player-id={player.id}
+      style={{ zIndex: 50 }}
     >
       {/* Red Cup for bottom-right player - only show when active */}
       {player.position === 'bottom-right' && isCurrentPlayer && (

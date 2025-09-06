@@ -65,10 +65,10 @@ export class TrajectoryService {
   };
 
   private static readonly PLAYER_POSITIONS: Record<string, PlayerPositionConfig> = {
-    'bottom-right': { x: '85%', y: '85%', angle: 225, arcHeight: 120, rotationDirection: -1, flightDuration: 1200, approach: 'diagonal-up-left' },
-    'bottom-left': { x: '15%', y: '85%', angle: 315, arcHeight: 120, rotationDirection: 1, flightDuration: 1200, approach: 'diagonal-up-right' },
-    'top-left': { x: '15%', y: '15%', angle: 45, arcHeight: 100, rotationDirection: 1, flightDuration: 1000, approach: 'diagonal-down-right' },
-    'top-right': { x: '85%', y: '15%', angle: 135, arcHeight: 100, rotationDirection: -1, flightDuration: 1000, approach: 'diagonal-down-left' }
+    'bottom-right': { x: '85%', y: '85%', angle: 225, arcHeight: 0, rotationDirection: -1, flightDuration: 1200, approach: 'to-top-left-edge' },
+    'bottom-left': { x: '15%', y: '85%', angle: 315, arcHeight: 0, rotationDirection: 1, flightDuration: 1200, approach: 'to-top-right-edge' },
+    'top-left': { x: '15%', y: '15%', angle: 45, arcHeight: 0, rotationDirection: 1, flightDuration: 1000, approach: 'to-bottom-right-edge' },
+    'top-right': { x: '85%', y: '15%', angle: 135, arcHeight: 0, rotationDirection: -1, flightDuration: 1000, approach: 'to-bottom-left-edge' }
   };
 
   private static readonly TRAJECTORY_CONFIGS: Record<string, TrajectoryConfig> = {
@@ -144,12 +144,18 @@ export class TrajectoryService {
     const xPercent = parseFloat(percentageX.replace('%', '')) / 100;
     const yPercent = parseFloat(percentageY.replace('%', '')) / 100;
     
-    // Assume game board dimensions (these should match your actual game board size)
-    const gameBoardSize = 400; // Adjust based on your actual game board size
+    // Get actual game board dimensions
+    const gameBoard = document.querySelector('.game-board');
+    let gameBoardSize = 400; // Fallback
+    
+    if (gameBoard) {
+      const rect = gameBoard.getBoundingClientRect();
+      gameBoardSize = Math.min(rect.width, rect.height);
+    }
     
     // Convert to coordinates relative to center (0,0 is center)
-    const x = (xPercent - 0.5) * gameBoardSize;
-    const y = (yPercent - 0.5) * gameBoardSize;
+    const x = (xPercent - 0.5) * gameBoardSize * 0.8; // Scale down to stay within bounds
+    const y = (yPercent - 0.5) * gameBoardSize * 0.8;
     
     return { x, y };
   }
@@ -764,14 +770,12 @@ export class TrajectoryService {
       initial: {
         x: trajectory[0].x,
         y: trajectory[0].y,
-        rotate: trajectory[0].rotation,
-        scale: trajectory[0].scale
+        rotate: trajectory[0].rotation
       },
       animate: {
         x: trajectory.map(point => point.x),
         y: trajectory.map(point => point.y),
         rotate: trajectory.map(point => point.rotation),
-        scale: trajectory.map(point => point.scale),
         transition: {
           duration,
           times,
@@ -779,7 +783,6 @@ export class TrajectoryService {
         }
       },
       exit: {
-        scale: 0,
         opacity: 0,
         transition: { duration: 0.3 }
       }
@@ -1044,125 +1047,4 @@ export class TrajectoryService {
     };
   }
 
-  /**
-   * Calculate ricochet frames for dice bouncing off edge
-   */
-  private static calculateRicochetFrames(
-    edgePoint: { x: number; y: number },
-    landingPoint: { x: number; y: number },
-    frameCount: number,
-    baseRotation: number
-  ): TrajectoryPoint[] {
-    const ricochetFrames: TrajectoryPoint[] = [];
-    
-    for (let i = 0; i < frameCount; i++) {
-      const progress = i / frameCount;
-      
-      // Smooth transition from edge to center with slight overshoot
-      const overshootFactor = 1.1 - (0.1 * progress); // Slight overshoot that corrects
-      const x = this.interpolateBezier(edgePoint.x, landingPoint.x * overshootFactor, progress);
-      const y = this.interpolateBezier(edgePoint.y, landingPoint.y * overshootFactor, progress);
-      
-      // Smaller arc for ricochet
-      const arcHeight = Math.sin(progress * Math.PI) * 40;
-      const adjustedY = y - arcHeight;
-      
-      // Fast tumbling during ricochet
-      const rotation = baseRotation * 1.5 + (progress * 540); // Extra rotation
-      const scale = 0.9 + (0.1 * Math.sin(progress * Math.PI * 2)); // Quick scale pulses
-      
-      ricochetFrames.push({
-        x,
-        y: adjustedY,
-        rotation,
-        scale
-      });
-    }
-    
-    return ricochetFrames;
-  }
-
-  /**
-   * Calculate landing frames with bounce effect
-   */
-  private static calculateLandingFrames(
-    landingPoint: { x: number; y: number },
-    frameCount: number,
-    baseRotation: number,
-    bounceCount: number
-  ): TrajectoryPoint[] {
-    const landingFrames: TrajectoryPoint[] = [];
-    const bounceHeight = this.TABLE_HIT_AREA.bounceHeight;
-    
-    for (let i = 0; i < frameCount; i++) {
-      const progress = i / frameCount;
-      
-      // Settle to final position
-      const x = landingPoint.x * (1 - 0.1 * Math.exp(-progress * 5)); // Quick settle
-      const y = landingPoint.y * (1 - 0.1 * Math.exp(-progress * 5));
-      
-      // Diminishing bounce effect
-      const bounceEffect = Math.exp(-progress * 3) * Math.sin(progress * Math.PI * bounceCount * 2);
-      const adjustedY = y - (bounceHeight * bounceEffect);
-      
-      // Slow down rotation
-      const rotation = baseRotation * 2 + (progress * 180); // Final rotation settle
-      const scale = 1 + (0.05 * bounceEffect); // Slight scale bounce
-      
-      landingFrames.push({
-        x,
-        y: adjustedY,
-        rotation,
-        scale
-      });
-    }
-    
-    return landingFrames;
-  }
-
-  /**
-   * Bezier interpolation for smooth curves
-   */
-  private static interpolateBezier(start: number, end: number, t: number): number {
-    // Using quadratic bezier with control point for natural arc
-    const controlOffset = (end - start) * 0.3;
-    const control = start + controlOffset;
-    
-    const oneMinusT = 1 - t;
-    return (oneMinusT * oneMinusT * start) + 
-           (2 * oneMinusT * t * control) + 
-           (t * t * end);
-  }
-
-  /**
-   * Generate Motion.js compatible animation variants
-   */
-  static generateMotionVariants(trajectory: TrajectoryPoint[], duration: number) {
-    const times = trajectory.map((_, index) => index / (trajectory.length - 1));
-    
-    return {
-      initial: {
-        x: trajectory[0].x,
-        y: trajectory[0].y,
-        rotate: trajectory[0].rotation,
-        scale: trajectory[0].scale
-      },
-      animate: {
-        x: trajectory.map(point => point.x),
-        y: trajectory.map(point => point.y),
-        rotate: trajectory.map(point => point.rotation),
-        scale: trajectory.map(point => point.scale),
-        transition: {
-          duration,
-          times,
-          ease: "easeOut"
-        }
-      },
-      exit: {
-        scale: 0,
-        opacity: 0,
-        transition: { duration: 0.3 }
-      }
-    };
-  }
 }
