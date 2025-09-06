@@ -318,7 +318,7 @@ export function useGame() {
             isTurnEnding: shouldEndTurn
           };
         });
-      }, 3200); // Dice trajectory animation duration (3.2 seconds total for 5 phases)
+      }, 900); // Dice trajectory animation duration (0.9 seconds total: 50ms delay + 750ms travel + 150ms settle)
       
       return { ...prevState, isRolling: true };
     });

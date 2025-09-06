@@ -38,10 +38,10 @@ export function TrajectoryDiceBoard({
         // After traveling, move to center
         const centerTimeout = setTimeout(() => {
           setAnimationPhase('center');
-        }, 1500); // 1.5s travel time
+        }, 750); // Slightly shorter to reduce pause
         
         return () => clearTimeout(centerTimeout);
-      }, 100); // Brief delay before traveling
+      }, 50); // Shorter delay before traveling
       
       return () => clearTimeout(travelTimeout);
     } else {
@@ -79,11 +79,11 @@ export function TrajectoryDiceBoard({
           transform: 'translate(-50%, -50%)'
         };
       case 'center':
-        // Dice settle close together at center
+        // Dice settle with wide separation to prevent overlap with score indicators
         const centerOffsets = [
-          { x: -30, y: 0 },   // Die 0: left
-          { x: 0, y: 0 },     // Die 1: center
-          { x: 30, y: 0 }     // Die 2: right
+          { x: -100, y: -30 }, // Die 0: far left and up
+          { x: 0, y: 40 },     // Die 1: center and down
+          { x: 100, y: -20 }   // Die 2: far right and up
         ];
         const centerOffset = centerOffsets[diceIndex] || { x: 0, y: 0 };
         
@@ -109,8 +109,9 @@ export function TrajectoryDiceBoard({
               style={getDicePositionStyle(index)}
               animate={getDicePositionStyle(index)}
               transition={{
-                duration: animationPhase === 'traveling' ? 1.5 : 0.5,
-                ease: animationPhase === 'traveling' ? "linear" : "easeInOut"
+                duration: animationPhase === 'traveling' ? 0.8 : 0.15,
+                ease: animationPhase === 'traveling' ? "linear" : "easeOut",
+                type: "tween"
               }}
             >
               <Dice

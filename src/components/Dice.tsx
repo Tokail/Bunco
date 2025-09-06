@@ -46,14 +46,9 @@ export function Dice({
         setRollFrame(prev => prev + 1);
       }, 100); // Switch every 100ms for realistic tumbling effect
 
-      // Stop after 1 second (10 frames)
-      const stopTimeout = setTimeout(() => {
-        clearInterval(rollInterval);
-      }, 1000);
-
+      // Continue rolling until isRolling becomes false
       return () => {
         clearInterval(rollInterval);
-        clearTimeout(stopTimeout);
       };
     }
   }, [isRolling]);
