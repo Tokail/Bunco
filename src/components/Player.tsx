@@ -131,12 +131,9 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     zIndex: 100,
     // Force new stacking context
     isolation: 'isolate',
-    // Add transparency when rolling, turn ending, or displaying score
-    opacity: (isRolling || isTurnEnding || isDisplayingScore) && isCurrentPlayer && player.isHuman ? 0.5 : 1,
-    // Add disabled class for CSS targeting
-    ...((isRolling || isTurnEnding || isDisplayingScore) && isCurrentPlayer && player.isHuman && {
-      filter: 'grayscale(20%)'
-    })
+    // Keep cups visually normal - only disable interaction, not appearance
+    opacity: 1,
+    // Remove visual disabled effects - cups should look normal even when disabled
   });
   
   // Check if player is in top position (text should appear above avatar)
@@ -165,9 +162,10 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
 
 
   return (
-    <div 
+    <div
       className={getPlayerClasses()}
       data-player-id={player.id}
+      style={{ zIndex: 50 }}
     >
       {/* Red Cup for bottom-right player - only show when active */}
       {player.position === 'bottom-right' && isCurrentPlayer && (
