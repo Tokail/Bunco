@@ -30,6 +30,9 @@ export function TrajectoryDiceBoard({
   
   // Handle animation phases when dice become visible
   useEffect(() => {
+    let travelTimeout: NodeJS.Timeout;
+    let centerTimeout: NodeJS.Timeout;
+    
     if (gameState.diceVisible && currentPlayer) {
       // Generate new random positions for this roll
       const newRandomPositions = gameState.dice.map(() => ({
@@ -43,22 +46,26 @@ export function TrajectoryDiceBoard({
       setAnimationPhase('spawn');
       
       // After a brief moment, start traveling
-      const travelTimeout = setTimeout(() => {
+      travelTimeout = setTimeout(() => {
         setAnimationPhase('traveling');
         
         // After traveling, move to center
-        const centerTimeout = setTimeout(() => {
+        centerTimeout = setTimeout(() => {
           setAnimationPhase('center');
         }, 500); // Faster travel time for more natural motion
-        
-        return () => clearTimeout(centerTimeout);
       }, 10); // Shorter delay before traveling
-      
-      return () => clearTimeout(travelTimeout);
     } else {
+      // Reset all animation state when dice become invisible
       setAnimationPhase('spawn');
+      setRandomPositions([]);
     }
-  }, [gameState.diceVisible, currentPlayer?.position, gameState.dice]);
+    
+    // Cleanup both timeouts
+    return () => {
+      clearTimeout(travelTimeout);
+      clearTimeout(centerTimeout);
+    };
+  }, [gameState.diceVisible, currentPlayer?.position]); // Remove gameState.dice dependency
   
   // Handle rolling animation during traveling phase
   useEffect(() => {
@@ -86,13 +93,13 @@ export function TrajectoryDiceBoard({
     const getSpawnPosition = () => {
       switch (currentPlayer.position) {
         case 'bottom-right':
-          return { x: 85, y: 85, offsetY: -150 }; // 85% from left, 85% from top, above player (toward center)
+          return { x: 85, y: 90, offsetY: -150 }; // 85% from left, 85% from top, above player (toward center)
         case 'bottom-left':
-          return { x: 15, y: 85, offsetY: -150 }; // 15% from left, 85% from top, above player (toward center)
+          return { x: 15, y: 90, offsetY: -150 }; // 15% from left, 85% from top, above player (toward center)
         case 'top-left':
           return { x: 15, y: 15, offsetY: 60 };   // 15% from left, 15% from top, closer to player (higher up)
         case 'top-right':
-          return { x: 85, y: 15, offsetY: 60 };   // 85% from left, 15% from top, closer to player (higher up)
+          return { x: 80, y: 15, offsetY: 60 };   // 85% from left, 15% from top, closer to player (higher up)
         default:
           return { x: 50, y: 50, offsetY: 0 };
       }
@@ -157,7 +164,7 @@ export function TrajectoryDiceBoard({
         return {
           left: '50%',
           top: '50%',
-          transform: `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px)) rotate(${randomPos.rotation}deg) scale(1.0)` // Maintain full size
+          transform: `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px)) rotate(${randomPos.rotation}deg)`
         };
       default:
         return {};
@@ -169,19 +176,80 @@ export function TrajectoryDiceBoard({
       {/* Individual dice with spreading animation */}
       {gameState.diceVisible && currentPlayer && (
         <>
-          {gameState.dice.map((value, index) => (
-            <motion.div
-              key={`traveling-dice-${index}`}
-              className="absolute"
-              style={getDicePositionStyle(index)}
-              animate={getDicePositionStyle(index)}
-              transition={{
-                duration: animationPhase === 'traveling' ? 0.6 : 0.45,
-                ease: animationPhase === 'traveling' ? [0.25, 0.46, 0.45, 0.94] : "easeOut",
-                type: "tween",
-                delay: index * 0.05 // Stagger animations by 50ms per die
-              }}
-            >
+          {gameState.dice.map((value, index) => {
+            // Get initial position based on current animation phase
+            const getInitialPosition = () => {
+              if (!currentPlayer) return {};
+              
+              // For center phase, start from traveling position to avoid restart
+              if (animationPhase === 'center') {
+                const getTravelDestination = () => {
+                  switch (currentPlayer.position) {
+                    case 'bottom-right':
+                      return { x: 25, y: 25 };
+                    case 'bottom-left':
+                      return { x: 75, y: 25 };
+                    case 'top-left':
+                      return { x: 75, y: 75 };
+                    case 'top-right':
+                      return { x: 25, y: 75 };
+                    default:
+                      return { x: 50, y: 50 };
+                  }
+                };
+                
+                const travelDest = getTravelDestination();
+                const spreadOffsets = [
+                  { x: -25, y: -25 },
+                  { x: 0, y: -30 },
+                  { x: 25, y: -25 }
+                ];
+                const offset = spreadOffsets[index] || { x: 0, y: 0 };
+                
+                return {
+                  left: `${travelDest.x + offset.x * 0.4}%`,
+                  top: `${travelDest.y + offset.y * 0.4}%`,
+                  transform: 'translate(-50%, -50%) scale(1.0)'
+                };
+              }
+              
+              // For spawn and traveling phases, start from spawn position
+              const getSpawnPosition = () => {
+                switch (currentPlayer.position) {
+                  case 'bottom-right':
+                    return { x: 85, y: 90, offsetY: -150 };
+                  case 'bottom-left':
+                    return { x: 15, y: 90, offsetY: -150 };
+                  case 'top-left':
+                    return { x: 15, y: 15, offsetY: 60 };
+                  case 'top-right':
+                    return { x: 80, y: 15, offsetY: 60 };
+                  default:
+                    return { x: 50, y: 50, offsetY: 0 };
+                }
+              };
+              
+              const spawnPos = getSpawnPosition();
+              return {
+                left: `${spawnPos.x}%`,
+                top: `${spawnPos.y}%`,
+                transform: `translate(-50%, ${spawnPos.offsetY}px) scale(0.8)`
+              };
+            };
+
+            return (
+              <motion.div
+                key={`traveling-dice-${index}-${gameState.diceVisible ? 'visible' : 'hidden'}-${animationPhase}`}
+                className="absolute"
+                initial={getInitialPosition()}
+                animate={getDicePositionStyle(index)}
+                transition={{
+                  duration: animationPhase === 'traveling' ? 0.6 : 0.45,
+                  ease: animationPhase === 'traveling' ? [0.25, 0.46, 0.45, 0.94] : "easeOut",
+                  type: "tween",
+                  delay: index * 0.05 // Stagger animations by 50ms per die
+                }}
+              >
               {animationPhase === 'traveling' ? (
                 // Show alternating rolling SVGs during traveling phase
                 <div className="w-20 h-20">
@@ -197,8 +265,9 @@ export function TrajectoryDiceBoard({
                   scoreIndicator={matchingDice?.scores[index] || undefined}
                 />
               )}
-            </motion.div>
-          ))}
+             </motion.div>
+           );
+         })}
         </>
       )}
     </div>

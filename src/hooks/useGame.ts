@@ -349,7 +349,7 @@ export function useGame() {
           isDisplayingScore: true
         };
       });
-    }, 750); // Dice trajectory animation duration (0.75 seconds total: 50ms delay + 600ms travel + 150ms settle)
+    }, 1000); // Increased from 750ms to 1000ms to ensure animations complete (10ms spawn + 500ms travel + 150ms settle + buffer)
   }, [stopTimer, startTimer, endRound, nextTurn]);
 
   // Update the ref when rollDice changes
