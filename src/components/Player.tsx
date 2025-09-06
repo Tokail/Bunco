@@ -28,6 +28,25 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     };
   }, []);
   
+  // Helper function to calculate shake animation duration from CSS
+  const calculateShakeDuration = () => {
+    // Create a temporary element to read CSS animation properties
+    const tempElement = document.createElement('div');
+    tempElement.className = 'cup-shaking';
+    tempElement.style.position = 'absolute';
+    tempElement.style.visibility = 'hidden';
+    tempElement.style.pointerEvents = 'none';
+    document.body.appendChild(tempElement);
+    
+    const computedStyle = window.getComputedStyle(tempElement);
+    const duration = parseFloat(computedStyle.animationDuration) || 0.9; // fallback to 0.9s
+    const iterationCount = parseFloat(computedStyle.animationIterationCount) || 1; // fallback to 1
+    
+    document.body.removeChild(tempElement);
+    
+    return duration * iterationCount * 1000; // convert to milliseconds
+  };
+
   // Shared shake animation logic for both human clicks and bot triggers
   const startShakeAnimation = () => {
     // Start shake animation
@@ -41,30 +60,13 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
       clearTimeout(shakeTimeoutRef.current);
     }
     
-    // Dynamically calculate total animation duration from CSS
-    const calculateAnimationDuration = () => {
-      // Create a temporary element to read CSS animation properties
-      const tempElement = document.createElement('div');
-      tempElement.className = 'cup-shaking';
-      tempElement.style.position = 'absolute';
-      tempElement.style.visibility = 'hidden';
-      tempElement.style.pointerEvents = 'none';
-      document.body.appendChild(tempElement);
-      
-      const computedStyle = window.getComputedStyle(tempElement);
-      const duration = parseFloat(computedStyle.animationDuration) || 0.9; // fallback to 0.9s
-      const iterationCount = parseFloat(computedStyle.animationIterationCount) || 1; // fallback to 1
-      
-      document.body.removeChild(tempElement);
-      
-      return duration * iterationCount * 1000; // convert to milliseconds
-    };
-    
     // End shake animation after full CSS animation duration
-    const totalDuration = calculateAnimationDuration();
+    const totalDuration = calculateShakeDuration();
     shakeTimeoutRef.current = setTimeout(() => {
       setIsShaking(false);
     }, totalDuration);
+    
+    return totalDuration; // Return duration for external use
   };
   
   // Handle external shake trigger for bots
@@ -100,11 +102,13 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     
     if (!isCupClickable || !onRoll) return;
     
-    // Show dice immediately when cup is clicked
-    onShowDice?.();
+    // Start shake animation and get its duration
+    const shakeDuration = startShakeAnimation();
     
-    // Start shake animation
-    startShakeAnimation();
+    // Show dice when cup stops shaking
+    setTimeout(() => {
+      onShowDice?.();
+    }, shakeDuration);
     
     // Trigger dice roll at 300ms (mid-shake) for human players
     setTimeout(() => {

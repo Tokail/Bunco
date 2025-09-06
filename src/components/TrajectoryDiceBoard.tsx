@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Dice } from './Dice';
 import { GameState, ScoreResult } from '../types/game';
+import { useState, useEffect } from 'react';
 
 interface TrajectoryDiceBoardProps {
   gameState: GameState;
@@ -18,35 +19,111 @@ export function TrajectoryDiceBoard({
   showTrajectoryAnimation = false
 }: TrajectoryDiceBoardProps) {
 
-  // Simple dice display in center - only show when diceVisible is true
+  // Dice display with traveling animation
+  const currentPlayer = gameState.players[gameState.currentPlayer];
+  const isBottomRightPlayer = currentPlayer?.position === 'bottom-right';
+  
+  const [animationPhase, setAnimationPhase] = useState<'spawn' | 'traveling' | 'center'>('spawn');
+  
+  // Handle animation phases when dice become visible
+  useEffect(() => {
+    if (gameState.diceVisible && isBottomRightPlayer) {
+      // Start at spawn position
+      setAnimationPhase('spawn');
+      
+      // After a brief moment, start traveling
+      const travelTimeout = setTimeout(() => {
+        setAnimationPhase('traveling');
+        
+        // After traveling, move to center
+        const centerTimeout = setTimeout(() => {
+          setAnimationPhase('center');
+        }, 1500); // 1.5s travel time
+        
+        return () => clearTimeout(centerTimeout);
+      }, 100); // Brief delay before traveling
+      
+      return () => clearTimeout(travelTimeout);
+    } else {
+      setAnimationPhase('spawn');
+    }
+  }, [gameState.diceVisible, isBottomRightPlayer]);
+  
+  // Calculate positions for individual dice based on animation phase
+  const getDicePositionStyle = (diceIndex: number) => {
+    const baseSpawnX = 85; // 85% from left (15% from right)
+    const baseSpawnY = 85; // 85% from top (15% from bottom)
+    
+    switch (animationPhase) {
+      case 'spawn':
+        return {
+          // All dice start at the same point
+          left: `${baseSpawnX}%`,
+          top: `${baseSpawnY}%`,
+          transform: 'translate(-50%, -150px)' // Above player position
+        };
+      case 'traveling':
+        // Spread dice out as they travel to hit area edge (opposite side)
+        // For bottom-right player, travel to top-left edge of hit area
+        const spreadOffsets = [
+          { x: -25, y: -25 }, // Die 0: top-left spread
+          { x: 0, y: -30 },   // Die 1: center-top spread
+          { x: 25, y: -25 }   // Die 2: top-right spread
+        ];
+        const offset = spreadOffsets[diceIndex] || { x: 0, y: 0 };
+        
+        return {
+          // Travel to ~25% (hit area edge) with spreading
+          left: `${25 + offset.x * 0.4}%`, // Reach actual hit area edge + spread
+          top: `${25 + offset.y * 0.4}%`,
+          transform: 'translate(-50%, -50%)'
+        };
+      case 'center':
+        // Dice settle close together at center
+        const centerOffsets = [
+          { x: -30, y: 0 },   // Die 0: left
+          { x: 0, y: 0 },     // Die 1: center
+          { x: 30, y: 0 }     // Die 2: right
+        ];
+        const centerOffset = centerOffsets[diceIndex] || { x: 0, y: 0 };
+        
+        return {
+          left: '50%',
+          top: '50%',
+          transform: `translate(calc(-50% + ${centerOffset.x}px), calc(-50% + ${centerOffset.y}px))`
+        };
+      default:
+        return {};
+    }
+  };
+  
   return (
-    <div className="absolute inset-0 flex items-center justify-center z-15 pointer-events-none">
-      <div className="relative">
-        {/* Center dice area - conditionally visible */}
-        {gameState.diceVisible && (
-          <div className="absolute inset-0 flex items-center justify-center">
+    <div className="absolute inset-0 z-15 pointer-events-none">
+      {/* Individual dice with spreading animation */}
+      {gameState.diceVisible && isBottomRightPlayer && (
+        <>
+          {gameState.dice.map((value, index) => (
             <motion.div
-              className="flex gap-3"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.4, ease: "backOut" }}
+              key={`traveling-dice-${index}`}
+              className="absolute"
+              style={getDicePositionStyle(index)}
+              animate={getDicePositionStyle(index)}
+              transition={{
+                duration: animationPhase === 'traveling' ? 1.5 : 0.5,
+                ease: animationPhase === 'traveling' ? "linear" : "easeInOut"
+              }}
             >
-              {gameState.dice.map((value, index) => (
-                <Dice
-                  key={`center-dice-${index}`}
-                  value={value}
-                  isRolling={gameState.isRolling}
-                  size="lg"
-                  isMatching={matchingDice?.indices.includes(index) || false}
-                  scoreIndicator={matchingDice?.scores[index] || undefined}
-                  showTrajectory={false}
-                />
-              ))}
+              <Dice
+                value={value}
+                isRolling={gameState.isRolling}
+                size="lg"
+                isMatching={matchingDice?.indices.includes(index) || false}
+                scoreIndicator={matchingDice?.scores[index] || undefined}
+              />
             </motion.div>
-          </div>
-        )}
-      </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

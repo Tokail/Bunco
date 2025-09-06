@@ -19,30 +19,17 @@ interface DiceProps {
   className?: string;
   isMatching?: boolean;
   scoreIndicator?: string;
-  // New trajectory animation props
-  showTrajectory?: boolean;
-  currentPlayer?: Player;
-  diceIndex?: number;
-  animationType?: 'normal' | 'bunco' | 'baby-bunco';
-  onTrajectoryComplete?: () => void;
 }
 
-export function Dice({ 
-  value, 
-  isRolling, 
-  size = 'md', 
-  className = '', 
-  isMatching = false, 
-  scoreIndicator,
-  showTrajectory = false,
-  currentPlayer,
-  diceIndex = 0,
-  animationType = 'normal',
-  onTrajectoryComplete
+export function Dice({
+  value,
+  isRolling,
+  size = 'md',
+  className = '',
+  isMatching = false,
+  scoreIndicator
 }: DiceProps) {
   const [rollFrame, setRollFrame] = useState(0);
-  const [trajectoryComplete, setTrajectoryComplete] = useState(false);
-  const [motionVariants, setMotionVariants] = useState<any>(null);
   
   const sizeClasses = {
     sm: 'w-8 h-8',
@@ -50,39 +37,6 @@ export function Dice({
     lg: 'w-20 h-20'  // Updated to 80px (20 * 4px = 80px)
   };
 
-  // Calculate trajectory animation when showTrajectory is enabled
-  useEffect(() => {
-    if (showTrajectory && currentPlayer && !trajectoryComplete) {
-      const config = TrajectoryService.getAnimationConfig(animationType);
-      const trajectory = TrajectoryService.calculateTrajectory(currentPlayer, diceIndex, config, currentPlayer.id === 1);
-      const variants = TrajectoryService.generateMotionVariants(trajectory, config.duration);
-      
-      setMotionVariants(variants);
-      
-      // Debug logging for Player 1
-      if (currentPlayer.id === 1) {
-        console.log('🎯 Player 1 Dice Animation Config:', {
-          diceIndex,
-          animationType,
-          configDuration: config.duration,
-          trajectoryPoints: trajectory.length,
-          variants: variants
-        });
-      }
-      
-      // Mark trajectory as complete after animation duration
-      const completeTimeout = setTimeout(() => {
-        setTrajectoryComplete(true);
-        onTrajectoryComplete?.();
-        
-        if (currentPlayer.id === 1) {
-          console.log('🎯 Player 1 Trajectory Complete for dice', diceIndex);
-        }
-      }, config.duration * 1000);
-      
-      return () => clearTimeout(completeTimeout);
-    }
-  }, [showTrajectory, currentPlayer, diceIndex, animationType, trajectoryComplete, onTrajectoryComplete]);
 
   // Roll animation effect - alternate between roll images every 100ms
   useEffect(() => {
@@ -104,68 +58,32 @@ export function Dice({
     }
   }, [isRolling]);
 
-  // Reset trajectory state when rolling starts
-  useEffect(() => {
-    if (isRolling) {
-      setTrajectoryComplete(false);
-      setMotionVariants(null);
-    }
-  }, [isRolling]);
-  
-
-  
-  // Determine animation state
-  const shouldShowTrajectory = showTrajectory && !trajectoryComplete;
-  const shouldShowRolling = isRolling && trajectoryComplete;
-  const shouldShowStatic = !isRolling && trajectoryComplete;
 
   return (
     <div className="relative">
-      <motion.div
+      <div
         className={`
           dice-container dice
-          ${sizeClasses[size]} 
-          ${isMatching ? 
-            'matching bg-transparent border-transparent' : 
+          ${sizeClasses[size]}
+          ${isMatching ?
+            'matching bg-transparent border-transparent' :
             'bg-transparent border-transparent'
-          } 
-          rounded-md relative flex items-center justify-center overflow-visible
+          }
+          rounded-md flex items-center justify-center overflow-visible
           ${size === 'lg' ? 'text-4xl' : size === 'md' ? 'text-2xl' : 'text-lg'}
           font-bold text-foreground
           ${className}
         `}
-        // Use trajectory animation variants if available, otherwise use default
-        variants={motionVariants}
-        initial={shouldShowTrajectory ? "initial" : undefined}
-        animate={shouldShowTrajectory ? "animate" : {}}
-        exit={motionVariants ? "exit" : undefined}
-        transition={shouldShowTrajectory ? undefined : {
-          duration: 0.6,
-          ease: "easeOut"
-        }}
-        // Add stagger delay for multiple dice
-        style={{
-          ...(showTrajectory && diceIndex > 0 ? {
-            animationDelay: `${TrajectoryService.calculateDiceStagger(3)[diceIndex]}s`
-          } : {})
-        }}
       >
-        {/* Trajectory phase - show rolling animation during flight */}
-        {shouldShowTrajectory && (
+        {/* Show rolling animation when rolling */}
+        {isRolling && (
           <div className="w-full h-full">
             {(rollFrame % 2) === 0 ? <Roll11 /> : <Roll21 />}
           </div>
         )}
         
-        {/* Rolling phase - show rolling animation at center */}
-        {shouldShowRolling && (
-          <div className="w-full h-full">
-            {(rollFrame % 2) === 0 ? <Roll11 /> : <Roll21 />}
-          </div>
-        )}
-        
-        {/* Static phase - show final dice value */}
-        {shouldShowStatic && (
+        {/* Show final dice value when not rolling */}
+        {!isRolling && (
           value === 1 ? (
             <div className="w-full h-full">
               <Dice11 />
@@ -194,47 +112,7 @@ export function Dice({
             <DicePlaceholder value={value} isMatching={isMatching} />
           )
         )}
-        
-        {/* Legacy rendering for non-trajectory mode */}
-        {!showTrajectory && (
-          <>
-            {isRolling && (
-              <div className="w-full h-full">
-                {(rollFrame % 2) === 0 ? <Roll11 /> : <Roll21 />}
-              </div>
-            )}
-            {!isRolling && (
-              value === 1 ? (
-                <div className="w-full h-full">
-                  <Dice11 />
-                </div>
-              ) : value === 2 ? (
-                <div className="w-full h-full">
-                  <Dice21 />
-                </div>
-              ) : value === 3 ? (
-                <div className="w-full h-full">
-                  <Dice31 />
-                </div>
-              ) : value === 4 ? (
-                <div className="w-full h-full">
-                  <Dice41 />
-                </div>
-              ) : value === 5 ? (
-                <div className="w-full h-full">
-                  <Dice51 />
-                </div>
-              ) : value === 6 ? (
-                <div className="w-full h-full">
-                  <Dice61 />
-                </div>
-              ) : (
-                <DicePlaceholder value={value} isMatching={isMatching} />
-              )
-            )}
-          </>
-        )}
-      </motion.div>
+      </div>
       
       {/* Score indicator */}
       {scoreIndicator && !isRolling && (

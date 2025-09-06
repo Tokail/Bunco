@@ -73,7 +73,7 @@ export function GameBoard({ gameState, onRoll, lastScoreResult, canRoll, matchin
           lastScoreResult={lastScoreResult}
           matchingDice={matchingDice}
           onTrajectoryComplete={handleTrajectoryComplete}
-          showTrajectoryAnimation={gameState.isRolling}
+          showTrajectoryAnimation={gameState.diceVisible && gameState.isRolling}
         />
 
         {/* Game content overlay */}
