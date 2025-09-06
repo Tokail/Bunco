@@ -120,13 +120,13 @@ export function TrajectoryDiceBoard({
     switch (animationPhase) {
       case 'spawn':
         return {
-          // All dice start at the same point near their player
+          // All dice start at the same point near their player, smaller scale
           left: `${spawnPos.x}%`,
           top: `${spawnPos.y}%`,
-          transform: `translate(-50%, ${spawnPos.offsetY}px)` // Above or below player position
+          transform: `translate(-50%, ${spawnPos.offsetY}px) scale(0.8)` // Start at 80% size
         };
       case 'traveling':
-        // Spread dice out as they travel to opposite side of table
+        // Spread dice out as they travel to opposite side of table, growing to full size
         const spreadOffsets = [
           { x: -25, y: -25 }, // Die 0: spread pattern
           { x: 0, y: -30 },   // Die 1: center spread
@@ -135,10 +135,10 @@ export function TrajectoryDiceBoard({
         const offset = spreadOffsets[diceIndex] || { x: 0, y: 0 };
         
         return {
-          // Travel to opposite side with spreading
+          // Travel to opposite side with spreading, growing to full size
           left: `${travelDest.x + offset.x * 0.4}%`,
           top: `${travelDest.y + offset.y * 0.4}%`,
-          transform: 'translate(-50%, -50%)'
+          transform: 'translate(-50%, -50%) scale(1.0)' // Grow to full size
         };
       case 'center':
         // Dice settle with randomized positions and rotations for natural scatter
@@ -157,7 +157,7 @@ export function TrajectoryDiceBoard({
         return {
           left: '50%',
           top: '50%',
-          transform: `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px)) rotate(${randomPos.rotation}deg)`
+          transform: `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px)) rotate(${randomPos.rotation}deg) scale(1.0)` // Maintain full size
         };
       default:
         return {};
