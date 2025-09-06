@@ -148,18 +148,21 @@ export function TrajectoryDiceBoard({
           transform: 'translate(-50%, -50%) scale(1.0)' // Grow to full size
         };
       case 'center':
-        // Dice settle with randomized positions and rotations for natural scatter
+        // Dice settle with increased spacing to prevent overlap
         const baseOffsets = [
-          { x: -100, y: -30 }, // Die 0: far left and up
-          { x: 0, y: 40 },     // Die 1: center and down
-          { x: 100, y: -20 }   // Die 2: far right and up
+          { x: -140, y: -25 }, // Die 0: far left and up - increased spacing
+          { x: 0, y: 50 },     // Die 1: center and down - moved further down
+          { x: 140, y: -15 }   // Die 2: far right and up - increased spacing
         ];
         const baseOffset = baseOffsets[diceIndex] || { x: 0, y: 0 };
         
-        // Use stored random values for this roll
+        // Use stored random values for this roll with reduced range to prevent overlap
         const randomPos = randomPositions[diceIndex] || { x: 0, y: 0, rotation: 0 };
-        const finalX = baseOffset.x + randomPos.x;
-        const finalY = baseOffset.y + randomPos.y;
+        // Reduce random variation from ±40px to ±25px to prevent dice touching
+        const reducedRandomX = randomPos.x * 0.625; // Scale down from ±40 to ±25
+        const reducedRandomY = randomPos.y * 0.625; // Scale down from ±40 to ±25
+        const finalX = baseOffset.x + reducedRandomX;
+        const finalY = baseOffset.y + reducedRandomY;
         
         return {
           left: '50%',
