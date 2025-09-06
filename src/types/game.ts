@@ -23,6 +23,7 @@ export interface GameState {
   timer: number;
   isTimerActive: boolean;
   diceVisible: boolean;
+  isDisplayingScore: boolean;
 }
 
 export interface DiceRoll {

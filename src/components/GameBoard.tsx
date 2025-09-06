@@ -61,6 +61,7 @@ export function GameBoard({ gameState, onRoll, lastScoreResult, canRoll, matchin
             soundService={soundService}
             triggerShake={isBotShaking && !player.isHuman && player.id === currentPlayer?.id}
             onShowDice={onShowDice}
+            isDisplayingScore={gameState.isDisplayingScore}
           />
         ))}
         

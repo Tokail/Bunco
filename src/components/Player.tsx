@@ -13,9 +13,10 @@ interface PlayerProps {
   soundService?: { diceShake: () => void };
   triggerShake?: boolean;
   onShowDice?: () => void;
+  isDisplayingScore?: boolean;
 }
 
-export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = false, isTurnEnding = false, soundService, triggerShake = false, onShowDice }: PlayerProps) {
+export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = false, isTurnEnding = false, soundService, triggerShake = false, onShowDice, isDisplayingScore = false }: PlayerProps) {
   const [isShaking, setIsShaking] = useState(false);
   const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -94,8 +95,8 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     return `player ${position} ${teamColor} ${active}`.trim();
   };
 
-  // Only allow cup clicks for human players who are current player and can roll and not currently rolling and turn is not ending
-  const isCupClickable = isCurrentPlayer && player.isHuman && canRoll && onRoll && !isRolling && !isTurnEnding;
+  // Only allow cup clicks for human players who are current player and can roll and not currently rolling and turn is not ending and not displaying score
+  const isCupClickable = isCurrentPlayer && player.isHuman && canRoll && onRoll && !isRolling && !isTurnEnding && !isDisplayingScore;
   
   const handleCupClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -125,10 +126,10 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     zIndex: 100,
     // Force new stacking context
     isolation: 'isolate',
-    // Add transparency when rolling or turn ending
-    opacity: (isRolling || isTurnEnding) && isCurrentPlayer && player.isHuman ? 0.5 : 1,
+    // Add transparency when rolling, turn ending, or displaying score
+    opacity: (isRolling || isTurnEnding || isDisplayingScore) && isCurrentPlayer && player.isHuman ? 0.5 : 1,
     // Add disabled class for CSS targeting
-    ...((isRolling || isTurnEnding) && isCurrentPlayer && player.isHuman && {
+    ...((isRolling || isTurnEnding || isDisplayingScore) && isCurrentPlayer && player.isHuman && {
       filter: 'grayscale(20%)'
     })
   });

@@ -20,7 +20,8 @@ export function useGame() {
     isTurnEnding: false,
     timer: 10,
     isTimerActive: false,
-    diceVisible: false
+    diceVisible: false,
+    isDisplayingScore: false
   }));
   
   const soundService = useRef(new SoundService());
@@ -180,7 +181,8 @@ export function useGame() {
         currentPlayer: nextPlayerIndex,
         turnScore: 0,
         isTurnEnding: false,
-        diceVisible: false // Hide dice when turn ends
+        diceVisible: false, // Hide dice when turn ends
+        isDisplayingScore: false // Reset score display state
       };
     });
     
@@ -220,7 +222,7 @@ export function useGame() {
       // Play shake sound
       soundService.current.diceShake();
       
-      return { ...prevState, diceVisible: false, isRolling: true };
+      return { ...prevState, diceVisible: false, isRolling: true, isDisplayingScore: false };
     });
     
     // Brief delay to ensure dice are hidden before showing them again
@@ -289,6 +291,13 @@ export function useGame() {
         
         const displayDuration = getDiceDisplayDuration(scoreResult.type);
         
+        // Always hide dice after display duration for continuing turns
+        if (!scoreResult.endTurn && newScore < 21) {
+          setTimeout(() => {
+            setGameState(prev => ({ ...prev, diceVisible: false, isDisplayingScore: false }));
+          }, displayDuration);
+        }
+        
         // Check for round win
         if (newScore >= 21) {
           soundService.current.roundWin();
@@ -336,7 +345,8 @@ export function useGame() {
           players: updatedPlayers,
           isRolling: false,
           isTurnEnding: shouldEndTurn,
-          diceVisible: true
+          diceVisible: true,
+          isDisplayingScore: true
         };
       });
     }, 750); // Dice trajectory animation duration (0.75 seconds total: 50ms delay + 600ms travel + 150ms settle)
@@ -369,7 +379,8 @@ export function useGame() {
       isTurnEnding: false,
       timer: 10,
       isTimerActive: false,
-      diceVisible: false
+      diceVisible: false,
+      isDisplayingScore: false
     });
     
     setLastScoreResult(null);
