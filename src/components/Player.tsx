@@ -73,9 +73,14 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
   // Handle external shake trigger for bots
   useEffect(() => {
     if (triggerShake && !player.isHuman && isCurrentPlayer) {
-      startShakeAnimation();
+      const shakeDuration = startShakeAnimation();
+      
+      // Show dice when bot cup stops shaking (same as human players)
+      setTimeout(() => {
+        onShowDice?.();
+      }, shakeDuration);
     }
-  }, [triggerShake, player.isHuman, isCurrentPlayer]);
+  }, [triggerShake, player.isHuman, isCurrentPlayer, onShowDice]);
   // Debug logging for human player (if needed)
   // if (player.isHuman) {
   //   console.log('Human player render:', {

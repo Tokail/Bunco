@@ -23,7 +23,6 @@ export function TrajectoryDiceBoard({
 
   // Dice display with traveling animation
   const currentPlayer = gameState.players[gameState.currentPlayer];
-  const isBottomRightPlayer = currentPlayer?.position === 'bottom-right';
   
   const [animationPhase, setAnimationPhase] = useState<'spawn' | 'traveling' | 'center'>('spawn');
   const [rollingFrame, setRollingFrame] = useState<1 | 2>(1);
@@ -31,7 +30,7 @@ export function TrajectoryDiceBoard({
   
   // Handle animation phases when dice become visible
   useEffect(() => {
-    if (gameState.diceVisible && isBottomRightPlayer) {
+    if (gameState.diceVisible && currentPlayer) {
       // Generate new random positions for this roll
       const newRandomPositions = gameState.dice.map(() => ({
         x: Math.random() * 80 - 40, // -40px to +40px variation
@@ -59,7 +58,7 @@ export function TrajectoryDiceBoard({
     } else {
       setAnimationPhase('spawn');
     }
-  }, [gameState.diceVisible, isBottomRightPlayer, gameState.dice]);
+  }, [gameState.diceVisible, currentPlayer?.position, gameState.dice]);
   
   // Handle rolling animation during traveling phase
   useEffect(() => {
@@ -79,33 +78,66 @@ export function TrajectoryDiceBoard({
     };
   }, [animationPhase]);
   
-  // Calculate positions for individual dice based on animation phase
+  // Calculate positions for individual dice based on animation phase and player position
   const getDicePositionStyle = (diceIndex: number) => {
-    const baseSpawnX = 85; // 85% from left (15% from right)
-    const baseSpawnY = 85; // 85% from top (15% from bottom)
+    if (!currentPlayer) return {};
+    
+    // Define spawn positions for each player position
+    const getSpawnPosition = () => {
+      switch (currentPlayer.position) {
+        case 'bottom-right':
+          return { x: 85, y: 85, offsetY: -150 }; // 85% from left, 85% from top, above player (toward center)
+        case 'bottom-left':
+          return { x: 15, y: 85, offsetY: -150 }; // 15% from left, 85% from top, above player (toward center)
+        case 'top-left':
+          return { x: 15, y: 15, offsetY: 60 };   // 15% from left, 15% from top, closer to player (higher up)
+        case 'top-right':
+          return { x: 85, y: 15, offsetY: 60 };   // 85% from left, 15% from top, closer to player (higher up)
+        default:
+          return { x: 50, y: 50, offsetY: 0 };
+      }
+    };
+    
+    // Define travel destinations (opposite side of table from player)
+    const getTravelDestination = () => {
+      switch (currentPlayer.position) {
+        case 'bottom-right':
+          return { x: 25, y: 25 }; // Travel to top-left area
+        case 'bottom-left':
+          return { x: 75, y: 25 }; // Travel to top-right area
+        case 'top-left':
+          return { x: 75, y: 75 }; // Travel to bottom-right area
+        case 'top-right':
+          return { x: 25, y: 75 }; // Travel to bottom-left area
+        default:
+          return { x: 50, y: 50 };
+      }
+    };
+    
+    const spawnPos = getSpawnPosition();
+    const travelDest = getTravelDestination();
     
     switch (animationPhase) {
       case 'spawn':
         return {
-          // All dice start at the same point
-          left: `${baseSpawnX}%`,
-          top: `${baseSpawnY}%`,
-          transform: 'translate(-50%, -150px)' // Above player position
+          // All dice start at the same point near their player
+          left: `${spawnPos.x}%`,
+          top: `${spawnPos.y}%`,
+          transform: `translate(-50%, ${spawnPos.offsetY}px)` // Above or below player position
         };
       case 'traveling':
-        // Spread dice out as they travel to hit area edge (opposite side)
-        // For bottom-right player, travel to top-left edge of hit area
+        // Spread dice out as they travel to opposite side of table
         const spreadOffsets = [
-          { x: -25, y: -25 }, // Die 0: top-left spread
-          { x: 0, y: -30 },   // Die 1: center-top spread
-          { x: 25, y: -25 }   // Die 2: top-right spread
+          { x: -25, y: -25 }, // Die 0: spread pattern
+          { x: 0, y: -30 },   // Die 1: center spread
+          { x: 25, y: -25 }   // Die 2: spread pattern
         ];
         const offset = spreadOffsets[diceIndex] || { x: 0, y: 0 };
         
         return {
-          // Travel to ~25% (hit area edge) with spreading
-          left: `${25 + offset.x * 0.4}%`, // Reach actual hit area edge + spread
-          top: `${25 + offset.y * 0.4}%`,
+          // Travel to opposite side with spreading
+          left: `${travelDest.x + offset.x * 0.4}%`,
+          top: `${travelDest.y + offset.y * 0.4}%`,
           transform: 'translate(-50%, -50%)'
         };
       case 'center':
@@ -135,7 +167,7 @@ export function TrajectoryDiceBoard({
   return (
     <div className="absolute inset-0 z-15 pointer-events-none">
       {/* Individual dice with spreading animation */}
-      {gameState.diceVisible && isBottomRightPlayer && (
+      {gameState.diceVisible && currentPlayer && (
         <>
           {gameState.dice.map((value, index) => (
             <motion.div
