@@ -2,6 +2,8 @@ import { motion } from 'motion/react';
 import { Dice } from './Dice';
 import { GameState, ScoreResult } from '../types/game';
 import { useState, useEffect } from 'react';
+import Roll11 from '../imports/Roll11';
+import Roll21 from '../imports/Roll21';
 
 interface TrajectoryDiceBoardProps {
   gameState: GameState;
@@ -24,10 +26,20 @@ export function TrajectoryDiceBoard({
   const isBottomRightPlayer = currentPlayer?.position === 'bottom-right';
   
   const [animationPhase, setAnimationPhase] = useState<'spawn' | 'traveling' | 'center'>('spawn');
+  const [rollingFrame, setRollingFrame] = useState<1 | 2>(1);
+  const [randomPositions, setRandomPositions] = useState<Array<{x: number, y: number, rotation: number}>>([]);
   
   // Handle animation phases when dice become visible
   useEffect(() => {
     if (gameState.diceVisible && isBottomRightPlayer) {
+      // Generate new random positions for this roll
+      const newRandomPositions = gameState.dice.map(() => ({
+        x: Math.random() * 80 - 40, // -40px to +40px variation
+        y: Math.random() * 80 - 40, // -40px to +40px variation
+        rotation: Math.random() * 90 - 45 // -45° to +45° rotation
+      }));
+      setRandomPositions(newRandomPositions);
+      
       // Start at spawn position
       setAnimationPhase('spawn');
       
@@ -38,16 +50,34 @@ export function TrajectoryDiceBoard({
         // After traveling, move to center
         const centerTimeout = setTimeout(() => {
           setAnimationPhase('center');
-        }, 750); // Slightly shorter to reduce pause
+        }, 500); // Faster travel time for more natural motion
         
         return () => clearTimeout(centerTimeout);
-      }, 50); // Shorter delay before traveling
+      }, 10); // Shorter delay before traveling
       
       return () => clearTimeout(travelTimeout);
     } else {
       setAnimationPhase('spawn');
     }
-  }, [gameState.diceVisible, isBottomRightPlayer]);
+  }, [gameState.diceVisible, isBottomRightPlayer, gameState.dice]);
+  
+  // Handle rolling animation during traveling phase
+  useEffect(() => {
+    let rollingInterval: NodeJS.Timeout;
+    
+    if (animationPhase === 'traveling') {
+      // Alternate between roll frames every 60ms for faster, smoother rolling effect
+      rollingInterval = setInterval(() => {
+        setRollingFrame(prev => prev === 1 ? 2 : 1);
+      }, 60);
+    }
+    
+    return () => {
+      if (rollingInterval) {
+        clearInterval(rollingInterval);
+      }
+    };
+  }, [animationPhase]);
   
   // Calculate positions for individual dice based on animation phase
   const getDicePositionStyle = (diceIndex: number) => {
@@ -79,18 +109,23 @@ export function TrajectoryDiceBoard({
           transform: 'translate(-50%, -50%)'
         };
       case 'center':
-        // Dice settle with wide separation to prevent overlap with score indicators
-        const centerOffsets = [
+        // Dice settle with randomized positions and rotations for natural scatter
+        const baseOffsets = [
           { x: -100, y: -30 }, // Die 0: far left and up
           { x: 0, y: 40 },     // Die 1: center and down
           { x: 100, y: -20 }   // Die 2: far right and up
         ];
-        const centerOffset = centerOffsets[diceIndex] || { x: 0, y: 0 };
+        const baseOffset = baseOffsets[diceIndex] || { x: 0, y: 0 };
+        
+        // Use stored random values for this roll
+        const randomPos = randomPositions[diceIndex] || { x: 0, y: 0, rotation: 0 };
+        const finalX = baseOffset.x + randomPos.x;
+        const finalY = baseOffset.y + randomPos.y;
         
         return {
           left: '50%',
           top: '50%',
-          transform: `translate(calc(-50% + ${centerOffset.x}px), calc(-50% + ${centerOffset.y}px))`
+          transform: `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px)) rotate(${randomPos.rotation}deg)`
         };
       default:
         return {};
@@ -109,18 +144,27 @@ export function TrajectoryDiceBoard({
               style={getDicePositionStyle(index)}
               animate={getDicePositionStyle(index)}
               transition={{
-                duration: animationPhase === 'traveling' ? 0.8 : 0.15,
-                ease: animationPhase === 'traveling' ? "linear" : "easeOut",
-                type: "tween"
+                duration: animationPhase === 'traveling' ? 0.6 : 0.45,
+                ease: animationPhase === 'traveling' ? [0.25, 0.46, 0.45, 0.94] : "easeOut",
+                type: "tween",
+                delay: index * 0.05 // Stagger animations by 50ms per die
               }}
             >
-              <Dice
-                value={value}
-                isRolling={gameState.isRolling}
-                size="lg"
-                isMatching={matchingDice?.indices.includes(index) || false}
-                scoreIndicator={matchingDice?.scores[index] || undefined}
-              />
+              {animationPhase === 'traveling' ? (
+                // Show alternating rolling SVGs during traveling phase
+                <div className="w-20 h-20">
+                  {rollingFrame === 1 ? <Roll11 /> : <Roll21 />}
+                </div>
+              ) : (
+                // Show normal dice during spawn and center phases
+                <Dice
+                  value={value}
+                  isRolling={gameState.isRolling}
+                  size="lg"
+                  isMatching={matchingDice?.indices.includes(index) || false}
+                  scoreIndicator={matchingDice?.scores[index] || undefined}
+                />
+              )}
             </motion.div>
           ))}
         </>
