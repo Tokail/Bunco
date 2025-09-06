@@ -7,14 +7,15 @@ import { Button } from './ui/button';
 import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
 
 export function BuncoGame() {
-  const { 
-    gameState, 
-    rollDice, 
-    resetGame, 
-    lastScoreResult, 
+  const {
+    gameState,
+    rollDice,
+    resetGame,
+    lastScoreResult,
     matchingDice,
     soundService,
-    isBotShaking
+    isBotShaking,
+    showDice
   } = useGame();
   
 
@@ -92,6 +93,7 @@ export function BuncoGame() {
         matchingDice={matchingDice}
         soundService={soundService}
         isBotShaking={isBotShaking}
+        onShowDice={showDice}
       />
       
 

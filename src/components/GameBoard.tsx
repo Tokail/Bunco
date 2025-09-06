@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion } from 'motion/react';
 import { Dice } from './Dice';
 import { Button } from './ui/button';
@@ -15,9 +16,10 @@ interface GameBoardProps {
   matchingDice?: { indices: number[], scores: string[] };
   soundService?: { diceShake: () => void };
   isBotShaking?: boolean;
+  onShowDice?: () => void;
 }
 
-export function GameBoard({ gameState, onRoll, lastScoreResult, canRoll, matchingDice, soundService, isBotShaking = false }: GameBoardProps) {
+export function GameBoard({ gameState, onRoll, lastScoreResult, canRoll, matchingDice, soundService, isBotShaking = false, onShowDice }: GameBoardProps) {
   const currentPlayer = gameState.players[gameState.currentPlayer];
   
   const handleRollClick = () => {
@@ -58,6 +60,7 @@ export function GameBoard({ gameState, onRoll, lastScoreResult, canRoll, matchin
             isTurnEnding={gameState.isTurnEnding}
             soundService={soundService}
             triggerShake={isBotShaking && !player.isHuman && player.id === currentPlayer?.id}
+            onShowDice={onShowDice}
           />
         ))}
         

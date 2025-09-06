@@ -22,6 +22,7 @@ export interface GameState {
   isTurnEnding: boolean;
   timer: number;
   isTimerActive: boolean;
+  diceVisible: boolean;
 }
 
 export interface DiceRoll {

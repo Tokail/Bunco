@@ -19,7 +19,8 @@ export function useGame() {
     isRolling: false,
     isTurnEnding: false,
     timer: 10,
-    isTimerActive: false
+    isTimerActive: false,
+    diceVisible: false
   }));
   
   const soundService = useRef(new SoundService());
@@ -54,6 +55,16 @@ export function useGame() {
     setTimeout(() => {
       setIsBotShaking(false);
     }, 100);
+  }, []);
+
+  // Function to show dice when cup is clicked
+  const showDice = useCallback(() => {
+    setGameState(prev => ({ ...prev, diceVisible: true }));
+  }, []);
+
+  // Function to hide dice after turn ends
+  const hideDice = useCallback(() => {
+    setGameState(prev => ({ ...prev, diceVisible: false }));
   }, []);
   
   const startTimer = useCallback(() => {
@@ -144,6 +155,8 @@ export function useGame() {
           } else {
             const delay = BotAIService.getBotDelay(nextPlayer.id);
             botTimeoutRef.current = setTimeout(() => {
+              // Show dice for bot player
+              showDice();
               triggerBotShake();
               // Small delay to let shake start before rolling
               setTimeout(() => {
@@ -165,7 +178,8 @@ export function useGame() {
         ...prev,
         currentPlayer: nextPlayerIndex,
         turnScore: 0,
-        isTurnEnding: false
+        isTurnEnding: false,
+        diceVisible: false // Hide dice when turn ends
       };
     });
     
@@ -181,6 +195,8 @@ export function useGame() {
         } else {
           const delay = BotAIService.getBotDelay(nextPlayer.id);
           botTimeoutRef.current = setTimeout(() => {
+            // Show dice for bot player
+            showDice();
             triggerBotShake();
             // Small delay to let shake start before rolling
             setTimeout(() => {
@@ -277,6 +293,7 @@ export function useGame() {
                 if (shouldContinue) {
                   const delay = BotAIService.getBotDelay(currentPlayer.id);
                   botTimeoutRef.current = setTimeout(() => {
+                    // Dice should already be visible for continuing rolls
                     triggerBotShake();
                     // Small delay to let shake start before rolling
                     setTimeout(() => {
@@ -333,7 +350,8 @@ export function useGame() {
       isRolling: false,
       isTurnEnding: false,
       timer: 10,
-      isTimerActive: false
+      isTimerActive: false,
+      diceVisible: false
     });
     
     setLastScoreResult(null);
@@ -366,6 +384,8 @@ export function useGame() {
     lastScoreResult,
     matchingDice,
     soundService: soundService.current,
-    isBotShaking
+    isBotShaking,
+    showDice,
+    hideDice
   };
 }

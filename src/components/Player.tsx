@@ -12,9 +12,10 @@ interface PlayerProps {
   isTurnEnding?: boolean;
   soundService?: { diceShake: () => void };
   triggerShake?: boolean;
+  onShowDice?: () => void;
 }
 
-export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = false, isTurnEnding = false, soundService, triggerShake = false }: PlayerProps) {
+export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = false, isTurnEnding = false, soundService, triggerShake = false, onShowDice }: PlayerProps) {
   const [isShaking, setIsShaking] = useState(false);
   const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -98,6 +99,9 @@ export function Player({ player, isCurrentPlayer, onRoll, canRoll, isRolling = f
     e.stopPropagation();
     
     if (!isCupClickable || !onRoll) return;
+    
+    // Show dice immediately when cup is clicked
+    onShowDice?.();
     
     // Start shake animation
     startShakeAnimation();
